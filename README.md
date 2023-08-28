@@ -6,4 +6,4 @@ Uses youtubeDL to play music on voice channels and has the Giphy API integrated.
 
 Currently working on new features such as: integrating Spotify API to display the information about the artist/track requested by the user.
 
-`*Make sure that if you want to use this code you must have a python script called **config.py** that contains the API keys!*`
+*Make sure that if you want to use this code you must have a python script called **config.py** that contains the API keys!*
