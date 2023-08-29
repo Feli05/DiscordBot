@@ -56,7 +56,7 @@ DJKhaled_quotes = ["Budget approved.", "Did the Drake vocals come in yet.", "Cal
 
 # Prefix-command functions
 
-# Simple Hello command
+# ask bot for a list of commands
 @bot.command()
 async def commands(ctx):
     await ctx.send("""```Thanks for using this bot! \n\ncommands available at the moment: \n 
