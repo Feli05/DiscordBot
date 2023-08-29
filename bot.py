@@ -2,9 +2,11 @@ import discord
 from discord.ext import commands
 import random
 import requests
-import youtube_dl
-import asyncio
-from config import DISCORD_TOKEN_RAW, GIPHY_API_KEY_RAW
+from pytube import YouTube
+import spotipy
+from asyncio import sleep
+from spotipy.oauth2 import SpotifyClientCredentials
+from config import DISCORD_TOKEN_RAW, GIPHY_API_KEY_RAW, SPOTIFY_CLIENT_ID_RAW, SPOTIFY_CLIENT_SECRET_RAW
 
 #**********************************************
 
@@ -13,6 +15,10 @@ from config import DISCORD_TOKEN_RAW, GIPHY_API_KEY_RAW
 DISCORD_TOKEN = DISCORD_TOKEN_RAW
 GIPHY_API_KEY = GIPHY_API_KEY_RAW
 GIPHY_BASE_URL = 'https://api.giphy.com/v1/gifs/search'
+SPOTIFY_ID = SPOTIFY_CLIENT_ID_RAW
+SPOTIFY_SECRET = SPOTIFY_CLIENT_SECRET_RAW
+
+spotify = spotipy.Spotify(client_credentials_manager=SpotifyClientCredentials(client_id=SPOTIFY_CLIENT_ID_RAW, client_secret=SPOTIFY_CLIENT_SECRET_RAW))
 
 #**********************************************
 
@@ -28,8 +34,8 @@ async def on_ready():
     try:
         synced = await bot.tree.sync()
         print("Commands Synced!")
-    except:
-        print(Exception)
+    except Exception as e:
+        print(e)
 
 #**********************************************
 
@@ -52,8 +58,17 @@ DJKhaled_quotes = ["Budget approved.", "Did the Drake vocals come in yet.", "Cal
 
 # Simple Hello command
 @bot.command()
-async def hello(ctx):
-    await ctx.reply("Hello")
+async def commands(ctx):
+    await ctx.send("""```Thanks for using this bot! \n\ncommands available at the moment: \n 
+            - '!gif <topic>': sends a gif about a topic you choose. \n
+            - 'pls jojo or pls jojos': sends a quote and a gif about JoJos Bizzare Adventure. \n 
+            - 'pls dj khaled': sends a dj khaled quote and gif. \n
+            - 'pls inspire me or pls inspire': sends a Rick Ross gif and an inspirational Vagabond quote. \n 
+            - '!join': joins the voice channel that the user is in. \n
+            - '!play <Youtube URL>': plays the requested song and sends information related to it if possible. \n 
+            - '!pause': pauses the song. \n 
+            - '!resume': resumes the song. \n 
+            - '!stop': stops the music completely. \n\nMore features are being developed!```""")
 
 # Command that asks user for GIF topic and requests URL from GiphyAPI
 @bot.command()
@@ -69,6 +84,7 @@ async def gif(ctx, input):
 
     #send the url to the discord channel
     await ctx.send(gif_url)
+
 
 #**********************************************
 
@@ -111,53 +127,95 @@ async def on_message(message):
 
 # Audio commands
 
-# Supress error noises
-youtube_dl.utils.bug_reports_message = lambda: ''
+# Spotify API functions ---
 
-# Youtube-DL format config
-ytdl_format_options = {
-    'format': 'bestaudio/best',
-    'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
-    'restrictfilenames': True,
-    'noplaylist': True,
-    'nocheckcertificate': True,
-    'ignoreerrors': False,
-    'logtostderr': False,
-    'quiet': True,
-    'no_warnings': True,
-    'default_search': 'auto',
-    'source_address': '0.0.0.0', 
-}
+# parse the video title into song name and artist name if possible
+def spotify_info(ctx, video_title, url):
 
-# ffmpeg config
-ffmpeg_options = {
-    'options': '-vn'
-}
+    # Since the audio is now playing successfully, we can parse the title to extract the information to send a request to Spotipy
+    if '-' in video_title and len(video_title.split('-')) == 2:
 
-ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
+        # If this if returns True, it means the format is something like this: 'artist name - song name'
+        artist_name = video_title.split('-')[0] # The artist name is usually the first part
+        song_name = video_title.split('-')[1] # the song name is usually the second part
 
-class YTDLSource(discord.PCMVolumeTransformer):
-    def __init__(self, source, *, data, volume=0.5):
-        super().__init__(source, volume)
-        self.data = data
-        self.title = data.get('title')
-        self.url = data.get('url')
+        # If the song name string has a parenthesis, we want to remove it
+        if '(' in song_name:
+            song_name = song_name.split('(')[0]
 
-    @classmethod
-    async def from_url(cls, url, *, loop=None, stream=False):
-        loop = loop or asyncio.get_event_loop()
-        data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
-        if 'entries' in data:
-            # take first item from a playlist
-            data = data['entries'][0]
+        # Now we can send a request to Spotify API with a song name and artist name
+        song_info = spotify_search(song_name, artist_name) # Returns a list with information about the song
 
-        if stream:
-            return cls(discord.FFmpegPCMAudio(data['url'], **ffmpeg_options), data=data)
+    # If the first conditional is not met, it means the title only contains the song name, so we directly check the parenthesis in the name
+    elif '(' in video_title:
+        song_name = video_title.split('(')[0] # Get the song name 
+        song_info = spotify_search(song_name) # Send a request to Spotify API only with a track name
+
+    # if song_info doesn't return Unknown it means that the request didn't have any problems
+    if song_info[0] != 'Unknown':
+        return (get_embed_msg(ctx, url, song_info, song_name))
+    else:
+        return ("Extra information about the requested song is not available.") 
+
+
+# Main function that sends the API request 
+def spotify_search(song_name, artist_name = 'Unknown'):
+    
+    # Request data from spotify
+    if artist_name != 'Unknown':
+        response = spotify.search(q= f'track: {song_name} artist: {artist_name}', limit=3, offset=0, type='track')
+    else: 
+        response = spotify.search(q= f'track: {song_name}', limit=3, offset=0, type='track')
+
+    # check if the items we are looking for exists inside the nested dictionary
+    # First, we check if the items list is not empty
+
+    if response['tracks']['items']:
+        info = response['tracks']['items'][0] # assign the list with the information we need to a variable to shorten its name
+
+        # check if theres an album key in the items dict
+        if 'album' in info:
+            album_name = info['album']['name']
         else:
-            filename = ytdl.prepare_filename(data)
-            return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
+            album_name = 'Unknown'
+        
+        # check if theres an external urls key in the items dict
+        if 'external_urls' in info:
+            song_link = info['external_urls']['spotify']
+        else:
+            song_link = 'Unknown'
+        
+        # check if theres an images key inside the album dict 
+        if 'album' in info and 'images' in info['album']:
+            album_cover = info['album']['images'][0]['url']
+        else:
+            album_cover = 'Unknown'
 
-# Prefix-command functions for controlling
+
+    # return a list with the name of the album, link to the song on spotify and image of the album or single. 
+    return [album_name, song_link, album_cover]
+
+
+# Function that creates an embed message to display the information from the API request
+def get_embed_msg(ctx, thumbnail_url, song_info, song_name):
+
+    # Create embed object
+    embed = discord.Embed(colour= discord.Color.purple(), title= f'Now playing {song_name}!', description=f'Album name: {song_info[0]}')
+
+    # Set footer
+    embed.set_footer(text= f'Song requested by {ctx.message.author}.')
+
+    # Set author 
+    embed.set_author(name= bot.user, url= 'https://github.com/Feli05/DiscordBot')
+    
+    # Set other components
+    embed.set_thumbnail(url= 'https://i.postimg.cc/pXWmBpGJ/discord-bot-profile.jpg')
+    embed.set_image(url= YouTube(thumbnail_url).thumbnail_url)
+
+    return embed
+
+
+# Prefix-command functions for controlling ---
 
 # Join the same VC as the user requesting it
 @bot.command()
@@ -171,7 +229,7 @@ async def join(ctx):
 @bot.command()
 async def leave(ctx):
     voice_client = discord.utils.get(bot.voice_clients, guild=ctx.guild)
-    if voice_client and voice_client.is_connected():
+    if voice_client:
         await voice_client.disconnect()
     else:
         await ctx.send("The bot is currently not in any voice chats.")
@@ -180,34 +238,62 @@ async def leave(ctx):
 @bot.command()
 async def play(ctx, url):
     try:
-        voice_client = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+        voice_client = ctx.message.guild.voice_client
         if not voice_client:
             await ctx.send("Bot is not connected to a voice channel.")
             return
 
         async with ctx.typing():
-            player = await YTDLSource.from_url(url, loop=bot.loop)
-            voice_client.play(player, after=lambda e: print(f'Player error: {e}') if e else None)
+            print('About to create player for music.')
+            # Creating a Youtube object and filtering the first audio only stream available
+            yt = YouTube(url).streams.filter(only_audio=True).get_audio_only()
+            print('Successfully created player!')
+            # Stream the audio with options '-vn' which disable video so it focuses on audio only 
+            voice_client.play(discord.FFmpegPCMAudio(yt.download(), options = '-vn'))
+            # Send a message with information extracted from the Spotify metadata
+            response = spotify_info(ctx, yt.title, url)
+        
+        # Send the embedded message
+        await ctx.send(embed=response)
 
-        await ctx.send(f'Now playing: {player.title}')
+        # Wait for the music to stop playing
+        while voice_client.is_playing():
+            await sleep(1)
+
+        # Send a last message
+        await ctx.send(f'Song ended. Hope you enjoyed {ctx.message.author}!')
+
     except discord.ClientException:
         await ctx.send("Error: Bot is not connected to a voice channel.")
-    except youtube_dl.DownloadError:
-        await ctx.send("Error downloading or playing the provided URL")
 
-
-# Stop playing a song
+# stop playing a song
 @bot.command()
 async def stop(ctx):
-    voice_client = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+    voice_client = ctx.message.guild.voice_client
     if voice_client.is_playing():
-        await voice_client.stop()
+        voice_client.stop()
     else:
-        await ctx.send("The bot is not playing a song currently.")
+        await ctx.send('Bot currently not playing a song.')
 
+# resume playing a song
+@bot.command()
+async def resume(ctx):
+    voice_client = ctx.message.guild.voice_client
+    if voice_client.is_paused():
+        voice_client.resume()
+    else:
+        await ctx.send('Song is already paused or there are none in queue.')
+
+# pause a song
+@bot.command()
+async def pause(ctx):
+    voice_client = ctx.message.guild.voice_client
+    if voice_client.is_playing():
+        voice_client.pause()
+    else:
+        await ctx.send('Bot currently not playing a song.')
 
 #**********************************************
-
 
 # Run commands
 
