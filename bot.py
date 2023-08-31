@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 import random
 import requests
-from pytube import YouTube
+from pytube import YouTube, Search
 import spotipy
 from asyncio import sleep
 from spotipy.oauth2 import SpotifyClientCredentials
@@ -130,7 +130,7 @@ async def on_message(message):
 # Spotify API functions ---
 
 # parse the video title into song name and artist name if possible
-def spotify_info(ctx, video_title, url):
+def spotify_info(ctx, video_title, input, url_or_search):
 
     print(f'"Debugging reasons": \n Video title: {video_title} \n')
     # Since the audio is now playing successfully, we can parse the title to extract the information to send a request to Spotipy
@@ -163,7 +163,7 @@ def spotify_info(ctx, video_title, url):
 
     # if song_info doesn't return Unknown it means that the request didn't have any problems
     if song_info[0] != 'Unknown':
-        return (get_embed_msg(ctx, url, song_info, song_name))
+        return (get_embed_msg(ctx, input, song_info, song_name, url_or_search))
     else:
         return (discord.Embed(colour= discord.Color.purple(), title='Unable to showcase additional information.')) 
 
@@ -207,7 +207,7 @@ def spotify_search(song_name, artist_name = 'Unknown'):
 
 
 # Function that creates an embed message to display the information from the API request
-def get_embed_msg(ctx, thumbnail_url, song_info, song_name):
+def get_embed_msg(ctx, thumbnail_param, song_info, song_name, url_or_search):
 
     # Create embed object
     embed = discord.Embed(colour= discord.Color.purple(), title= f'Now playing: {song_name}!', description=f'Album name: {song_info[0]}')
@@ -220,7 +220,12 @@ def get_embed_msg(ctx, thumbnail_url, song_info, song_name):
     
     # Set other components
     embed.set_thumbnail(url= 'https://i.postimg.cc/pXWmBpGJ/discord-bot-profile.jpg')
-    embed.set_image(url= YouTube(thumbnail_url).thumbnail_url)
+
+    # if url_or_search returns True, it means the thumbnail_url is a url and we call the Youtube class, else we call the Search class
+    if url_or_search:
+        embed.set_image(url= YouTube(thumbnail_param).thumbnail_url)
+    else:
+        embed.set_image(url= Search(thumbnail_param).results[0].thumbnail_url)
 
     return embed
 
@@ -246,7 +251,10 @@ async def leave(ctx):
     
 # Play a song
 @bot.command()
-async def play(ctx, url):
+async def play(ctx, *args):
+
+    input = ' '.join(args) # Concat the args list with spaces. This will prevent errors from when the user uses the search functionality
+
     try:
         voice_client = ctx.message.guild.voice_client
         if not voice_client:
@@ -255,13 +263,25 @@ async def play(ctx, url):
 
         async with ctx.typing():
             print('About to create player for music.')
-            # Creating a Youtube object and filtering the first audio only stream available
-            yt = YouTube(url).streams.filter(only_audio=True).get_audio_only()
+
+            # Assign a Stream object to the yt variable to then reproduce and also assign boolean to variable Type so it knows its a url or text search
+            # If the input is Youtube link then use the Youtube class
+            if 'https://www.youtube.com' in input:
+                link = YouTube(input).streams.filter(only_audio=True).get_audio_only() 
+                yt = link
+                url_or_search = True
+            # If the input is normal text, use the Search class
+            else: 
+                search = Search(input).results[0].streams.filter(only_audio=True).get_audio_only()
+                yt = search
+                url_or_search = False
+
             print('Successfully created player!')
+
             # Stream the audio with options '-vn' which disable video so it focuses on audio only 
             voice_client.play(discord.FFmpegPCMAudio(yt.download(), options = '-vn'))
             # Send a message with information extracted from the Spotify metadata
-            response = spotify_info(ctx, yt.title, url)
+            response = spotify_info(ctx, yt.title, input, url_or_search)
         
         # Send the embedded message
         await ctx.send(embed=response)
