@@ -132,6 +132,7 @@ async def on_message(message):
 # parse the video title into song name and artist name if possible
 def spotify_info(ctx, video_title, url):
 
+    print(f'"Debugging reasons": \n Video title: {video_title} \n')
     # Since the audio is now playing successfully, we can parse the title to extract the information to send a request to Spotipy
     if '-' in video_title and len(video_title.split('-')) == 2:
 
@@ -148,14 +149,23 @@ def spotify_info(ctx, video_title, url):
 
     # If the first conditional is not met, it means the title only contains the song name, so we directly check the parenthesis in the name
     elif '(' in video_title:
+        artist_name = 'Unknown' # The artist name is unkown since we only have song name
         song_name = video_title.split('(')[0] # Get the song name 
         song_info = spotify_search(song_name) # Send a request to Spotify API only with a track name
+    # This means that the whole title is just the song so we set the artist name to unknown and assign the song name to the video title itself
+    else:
+        artist_name = 'Unknown'
+        song_name = video_title
+        song_info = spotify_search(song_name)
+
+    # print statement to double check if the variables are as they should be
+    print(f'"Debugging reasons": \n Song name: {song_name} \n Artist name: {artist_name} \n')
 
     # if song_info doesn't return Unknown it means that the request didn't have any problems
     if song_info[0] != 'Unknown':
         return (get_embed_msg(ctx, url, song_info, song_name))
     else:
-        return ("Extra information about the requested song is not available.") 
+        return (discord.Embed(colour= discord.Color.purple(), title='Unable to showcase additional information.')) 
 
 
 # Main function that sends the API request 
@@ -200,7 +210,7 @@ def spotify_search(song_name, artist_name = 'Unknown'):
 def get_embed_msg(ctx, thumbnail_url, song_info, song_name):
 
     # Create embed object
-    embed = discord.Embed(colour= discord.Color.purple(), title= f'Now playing {song_name}!', description=f'Album name: {song_info[0]}')
+    embed = discord.Embed(colour= discord.Color.purple(), title= f'Now playing: {song_name}!', description=f'Album name: {song_info[0]}')
 
     # Set footer
     embed.set_footer(text= f'Song requested by {ctx.message.author}.')
@@ -257,7 +267,7 @@ async def play(ctx, url):
         await ctx.send(embed=response)
 
         # Wait for the music to stop playing
-        while voice_client.is_playing():
+        while voice_client.is_playing() or voice_client.is_paused():
             await sleep(1)
 
         # Send a last message
