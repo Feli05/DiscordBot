@@ -169,10 +169,6 @@ async def on_message(message):
         await message.channel.send(response)
         await gif(message.channel, "Rick Ross")
 
-    elif "pls" in user_message:
-        await message.channel.send("Not a valid command. Try using '!help'.")
-
-
     await bot.process_commands(message)
 
 #**********************************************
