@@ -7,6 +7,7 @@ import spotipy
 from asyncio import sleep
 from spotipy.oauth2 import SpotifyClientCredentials
 from config import DISCORD_TOKEN_RAW, GIPHY_API_KEY_RAW, SPOTIFY_CLIENT_ID_RAW, SPOTIFY_CLIENT_SECRET_RAW
+from bot_extra import DJKhaled_quotes, Vagabond_quotes, JoJo_quotes, commands_help, music_help, art_help
 
 #**********************************************
 
@@ -15,6 +16,7 @@ from config import DISCORD_TOKEN_RAW, GIPHY_API_KEY_RAW, SPOTIFY_CLIENT_ID_RAW, 
 DISCORD_TOKEN = DISCORD_TOKEN_RAW
 GIPHY_API_KEY = GIPHY_API_KEY_RAW
 GIPHY_BASE_URL = 'https://api.giphy.com/v1/gifs/search'
+WAIFU_BASE_URL = 'https://api.waifu.im/search'
 SPOTIFY_ID = SPOTIFY_CLIENT_ID_RAW
 SPOTIFY_SECRET = SPOTIFY_CLIENT_SECRET_RAW
 
@@ -39,36 +41,64 @@ async def on_ready():
 
 #**********************************************
 
-# List of quote arrays
+# Help commands
 
-Vagabond_quotes = ["Preoccupied with a single leaf, you won’t see the tree… preoccupied with a single tree, you’ll miss the entire forest.", 
-" You must understand that there is more than one path to the top of the mountain.", "Resentment and complaint are appropriate neither for oneself nor others.", 
-"Think lightly of yourself and deeply of the world.", "Immature strategy is the cause of grief."]
-
-JoJo_quotes = ["Arrivederci.", "Welcome... To the True Man’s World.", "Being human means having limits. I’ve learned something. The more carefully you scheme, the more unexpected events come along.",
-"What is courage? Courage is owning your fear!", "Loneliness will make a man hollow.", "Humans ought to lead a life that leads them to heaven. This is what makes humans beautiful.",
-"The shortest path was a detour.", "Presumptions are more terrifying than anything else. Especially when you are under the impression that your strengths and abilities are impressive."]
-
-DJKhaled_quotes = ["Budget approved.", "Did the Drake vocals come in yet.", "Call me Asparagus", "Tell 'em to bring the yacht out.", "Tell 'em to bring out the whole ocean.", 
-"And perhaps what is this.", "Let's go golfing!", "Life...is Roblox", " They ain't believe in us... GOD DID", "Have you ever played rugby.", "Tell 'em to bring out the lobster."]
-
-#**********************************************
-
-# Prefix-command functions
-
-# ask bot for a list of commands
+# ask bot for a general overview of commands
 @bot.command()
 async def commands(ctx):
-    await ctx.send("""```Thanks for using this bot! \n\ncommands available at the moment: \n 
-            - '!gif <topic>': sends a gif about a topic you choose. \n
-            - 'pls jojo or pls jojos': sends a quote and a gif about JoJos Bizzare Adventure. \n 
-            - 'pls dj khaled': sends a dj khaled quote and gif. \n
-            - 'pls inspire me or pls inspire': sends a Rick Ross gif and an inspirational Vagabond quote. \n 
-            - '!join': joins the voice channel that the user is in. \n
-            - '!play <Youtube URL>': plays the requested song and sends information related to it if possible. \n 
-            - '!pause': pauses the song. \n 
-            - '!resume': resumes the song. \n 
-            - '!stop': stops the music completely. \n\nMore features are being developed!```""")
+
+    # Create an embed object
+    embed = discord.Embed(colour= discord.Color.orange(), type='rich', title='Joestar Bot command list!', description='For further help, please do ``!<command>``')
+    # Set author 
+    embed.set_author(name=bot.user, url='https://github.com/Feli05/DiscordBot')
+    # Set embed thumbnail
+    embed.set_thumbnail(url='https://i.postimg.cc/pXWmBpGJ/discord-bot-profile.jpg')
+    # Set the main text on the embed
+    embed.add_field(name='commands available', value=commands_help, inline=True)
+    # Set footer text
+    embed.set_footer(text=f'Requested by: {ctx.message.author}')
+    
+    await ctx.send(embed=embed)
+
+
+# Detailed help about music commands
+@bot.command()
+async def music(ctx):
+
+    # Create an embed object
+    embed = discord.Embed(colour= discord.Color.orange(), type= 'rich', title= 'Music commands help!', description='Detailed help for all the music commands available on the Joestar bot.')
+    # Set author 
+    embed.set_author(name= bot.user, url= 'https://github.com/Feli05/DiscordBot')
+    # Set embed thumbnail
+    embed.set_thumbnail(url= 'https://i.postimg.cc/pXWmBpGJ/discord-bot-profile.jpg')
+    # Set the main text on the embed
+    embed.add_field(name='commands available', value=music_help, inline=True)
+    # Set footer text
+    embed.set_footer(text=f'Requested by: {ctx.message.author}')
+    
+    await ctx.send(embed=embed)
+
+
+# Detailed help about art commands
+@bot.command()
+async def art(ctx):
+
+    # Create an embed object
+    embed = discord.Embed(colour= discord.Color.orange(), type= 'rich', title= 'Art commands help!', description='Detailed help for all the art commands available on the Joestar bot.')
+    # Set author 
+    embed.set_author(name= bot.user, url= 'https://github.com/Feli05/DiscordBot')
+    # Set embed thumbnail
+    embed.set_thumbnail(url= 'https://i.postimg.cc/pXWmBpGJ/discord-bot-profile.jpg')
+    # Set the main text on the embed
+    embed.add_field(name='commands available', value=art_help, inline=True)
+    # Set footer text
+    embed.set_footer(text=f'Requested by: {ctx.message.author}')
+    
+    await ctx.send(embed=embed)
+    
+#**********************************************
+
+# Command-based functions
 
 # Command that asks user for GIF topic and requests URL from GiphyAPI
 @bot.command()
@@ -77,13 +107,35 @@ async def gif(ctx, input):
     params = {'api_key': GIPHY_API_KEY, 'q': input, 'rating': 'g', 'lang': "en"}
     response = requests.get(GIPHY_BASE_URL, params=params)
 
-    #Parse the json request and choose random url 
-    parsed_data = response.json()['data']
-    random_data = random.choice(parsed_data)
-    gif_url = random_data['images']['original']['url']
+    # Check if the status code is good
+    if response.status_code == 200:
+        # Take the url from the dict
+        data = response.json()['data']
+        random_data = random.choice(data)
+        gif_url = random_data['images']['original']['url']
+        await ctx.send(gif_url)
+    # If the status code is an error code, send an error message
+    else: 
+        await ctx.send("Error sending request. Try again later.")
 
-    #send the url to the discord channel
-    await ctx.send(gif_url)
+
+# Implementing new API Waifu.im as a bot command
+@bot.command()
+async def waifu(ctx, input='waifu'):
+
+    # Specify the parameters for the request
+    params = {'included_tags': input, 'many': False}
+    response = requests.get(WAIFU_BASE_URL, params=params)
+
+    # Check if the status code is good
+    if response.status_code == 200:
+        # Take the url from the dict
+        data = response.json()
+        waifu_url = data['images'][0]['url']
+        await ctx.send(waifu_url)
+    # If the status code is an error code, send an error message
+    else:
+        await ctx.send("Error sending request. Try again later")
 
 
 #**********************************************
@@ -107,18 +159,18 @@ async def on_message(message):
         await message.channel.send(response)
         await gif(message.channel, "DJ Khaled")
      
-    elif "pls jojo" == user_message.lower() or "pls jojos" == user_message.lower():
+    elif "pls jojos" == user_message.lower():
         response = random.choice(JoJo_quotes)
         await message.channel.send(response)
         await gif(message.channel, "JoJos Anime")
   
-    elif "pls inspire" == user_message.lower() or "pls inspire me" == user_message.lower():
+    elif "pls inspire" == user_message.lower():
         response = random.choice(Vagabond_quotes)
         await message.channel.send(response)
         await gif(message.channel, "Rick Ross")
 
-    elif "pls " in user_message:
-            await message.channel.send("Not a valid command. Try using '!help'.")
+    elif "pls" in user_message:
+        await message.channel.send("Not a valid command. Try using '!help'.")
 
 
     await bot.process_commands(message)
@@ -210,7 +262,7 @@ def spotify_search(song_name, artist_name = 'Unknown'):
 def get_embed_msg(ctx, thumbnail_param, song_info, song_name, url_or_search):
 
     # Create embed object
-    embed = discord.Embed(colour= discord.Color.purple(), title= f'Now playing: {song_name}!', description=f'Album name: {song_info[0]}')
+    embed = discord.Embed(colour= discord.Color.orange(), title= f'Now playing: {song_name}!', description=f'Album name: {song_info[0]}')
 
     # Set footer
     embed.set_footer(text= f'Song requested by {ctx.message.author}.')
@@ -253,48 +305,53 @@ async def leave(ctx):
 @bot.command()
 async def play(ctx, *args):
 
-    input = ' '.join(args) # Concat the args list with spaces. This will prevent errors from when the user uses the search functionality
+    # Check if the user actually inputs something with the play command
+    if not args:
+        await ctx.send("You forgot to send a YT url or the name of the song!")
+    else:
+        input = ' '.join(args) # Concat the args list with spaces. This will prevent errors from when the user uses the search functionality
 
-    try:
-        voice_client = ctx.message.guild.voice_client
-        if not voice_client:
-            await ctx.send("Bot is not connected to a voice channel.")
-            return
+        # Rest of the play functionality
+        try:
+            voice_client = ctx.message.guild.voice_client
+            if not voice_client:
+                await ctx.send("Bot is not connected to a voice channel.")
+                return
 
-        async with ctx.typing():
-            print('About to create player for music.')
+            async with ctx.typing():
+                print('About to create player for music.')
 
-            # Assign a Stream object to the yt variable to then reproduce and also assign boolean to variable Type so it knows its a url or text search
-            # If the input is Youtube link then use the Youtube class
-            if 'https://www.youtube.com' in input:
-                link = YouTube(input).streams.filter(only_audio=True).get_audio_only() 
-                yt = link
-                url_or_search = True
-            # If the input is normal text, use the Search class
-            else: 
-                search = Search(input).results[0].streams.filter(only_audio=True).get_audio_only()
-                yt = search
-                url_or_search = False
+                # Assign a Stream object to the yt variable to then reproduce and also assign boolean to variable Type so it knows its a url or text search
+                # If the input is Youtube link then use the Youtube class
+                if 'https://www.youtube.com' in input:
+                    link = YouTube(input).streams.filter(only_audio=True).get_audio_only() 
+                    yt = link
+                    url_or_search = True
+                # If the input is normal text, use the Search class
+                else: 
+                    search = Search(input).results[0].streams.filter(only_audio=True).get_audio_only()
+                    yt = search
+                    url_or_search = False
 
-            print('Successfully created player!')
+                print('Successfully created player!')
 
-            # Stream the audio with options '-vn' which disable video so it focuses on audio only 
-            voice_client.play(discord.FFmpegPCMAudio(yt.download(), options = '-vn'))
-            # Send a message with information extracted from the Spotify metadata
-            response = spotify_info(ctx, yt.title, input, url_or_search)
-        
-        # Send the embedded message
-        await ctx.send(embed=response)
+                # Stream the audio with options '-vn' which disable video so it focuses on audio only 
+                voice_client.play(discord.FFmpegPCMAudio(yt.download(), options = '-vn'))
+                # Send a message with information extracted from the Spotify metadata
+                response = spotify_info(ctx, yt.title, input, url_or_search)
+            
+            # Send the embedded message
+            await ctx.send(embed=response)
 
-        # Wait for the music to stop playing
-        while voice_client.is_playing() or voice_client.is_paused():
-            await sleep(1)
+            # Wait for the music to stop playing
+            while voice_client.is_playing() or voice_client.is_paused():
+                await sleep(1)
 
-        # Send a last message
-        await ctx.send(f'Song ended. Hope you enjoyed {ctx.message.author}!')
+            # Send a last message
+            await ctx.send(f'Song ended. Hope you enjoyed {ctx.message.author}!')
 
-    except discord.ClientException:
-        await ctx.send("Error: Bot is not connected to a voice channel.")
+        except discord.ClientException:
+            await ctx.send("Error: Bot is not connected to a voice channel.")
 
 # stop playing a song
 @bot.command()
