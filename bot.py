@@ -311,7 +311,7 @@ async def play(ctx, *args):
     else:
         input = ' '.join(args) # Concat the args list with spaces. This will prevent errors from when the user uses the search functionality
 
-        # Rest of the play functionality
+        # Rest of the play function
         try:
             voice_client = ctx.message.guild.voice_client
             if not voice_client:
@@ -356,29 +356,38 @@ async def play(ctx, *args):
 # stop playing a song
 @bot.command()
 async def stop(ctx):
-    voice_client = ctx.message.guild.voice_client
-    if voice_client.is_playing():
-        voice_client.stop()
-    else:
-        await ctx.send('Bot currently not playing a song.')
+    try:
+        voice_client = ctx.message.guild.voice_client
+        if voice_client.is_playing() and voice_client:
+            voice_client.stop()
+        else:
+            await ctx.send('Bot currently not playing a song.')
+    except Exception as e: 
+        await ctx.send(e)
 
 # resume playing a song
 @bot.command()
 async def resume(ctx):
-    voice_client = ctx.message.guild.voice_client
-    if voice_client.is_paused():
-        voice_client.resume()
-    else:
-        await ctx.send('Song is already paused or there are none in queue.')
+    try: 
+        voice_client = ctx.message.guild.voice_client
+        if voice_client.is_paused() and voice_client:
+            voice_client.resume()
+        else:
+            await ctx.send('Song is already paused or there are none in queue.')
+    except Exception as e: 
+        await ctx.send(e)
 
 # pause a song
 @bot.command()
 async def pause(ctx):
-    voice_client = ctx.message.guild.voice_client
-    if voice_client.is_playing():
-        voice_client.pause()
-    else:
-        await ctx.send('Bot currently not playing a song.')
+    try:
+        voice_client = ctx.message.guild.voice_client
+        if voice_client.is_playing() and voice_client:
+            voice_client.pause()
+        else:
+            await ctx.send('Bot currently not playing a song.')
+    except Exception as e:
+        await ctx.send(e)
 
 #**********************************************
 
